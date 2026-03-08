@@ -1,0 +1,57 @@
+{
+  "name": "xhoard",
+  "version": "0.4.0",
+  "description": "Archive Twitter/X bookmarks to markdown with link expansion, content extraction, and AI-powered categorization",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "xhoard": "src/cli.js"
+  },
+  "scripts": {
+    "fetch": "bun src/cli.js fetch",
+    "process": "bun src/cli.js process",
+    "start": "bun src/cli.js",
+    "test": "bun test",
+    "prepublishOnly": "bun test"
+  },
+  "keywords": [
+    "twitter",
+    "x",
+    "bookmarks",
+    "archive",
+    "markdown",
+    "opencode",
+    "twitter-archiver",
+    "bookmark-manager",
+    "obsidian"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TudorAndrei/xhoard"
+  },
+  "bugs": {
+    "url": "https://github.com/TudorAndrei/xhoard/issues"
+  },
+  "homepage": "https://github.com/TudorAndrei/xhoard#readme",
+  "files": [
+    "src/",
+    ".opencode/commands/process-bookmarks.md",
+    "LICENSE",
+    "README.md",
+    "xhoard.config.example.json"
+  ],
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=20"
+  },
+  "packageManager": "bun@1.0.0",
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.2.21",
+    "dayjs": "^1.11.10"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

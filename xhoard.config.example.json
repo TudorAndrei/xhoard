@@ -1,0 +1,15 @@
+{
+  "archiveMode": "files",
+  "archiveDir": "./bookmarks",
+  "archiveFile": "./bookmarks.md",
+  "pendingFile": "./.state/pending-bookmarks.json",
+  "stateFile": "./.state/bookmarks-state.json",
+  "timezone": "UTC",
+  "twitter": {
+    "authToken": "YOUR_AUTH_TOKEN_HERE",
+    "ct0": "YOUR_CT0_HERE"
+  },
+  "autoInvokeOpencode": true,
+  "opencodeModel": "opencode/glm-4.7-free",
+  "opencodeTimeout": 900000
+}

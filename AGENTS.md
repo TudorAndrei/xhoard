@@ -1,0 +1,3 @@
+# development
+
+always use bun
