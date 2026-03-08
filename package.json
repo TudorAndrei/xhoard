@@ -1,6 +1,6 @@
 {
   "name": "xhoard",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "Archive Twitter/X bookmarks to markdown with link expansion, content extraction, and AI-powered categorization",
   "type": "module",
   "main": "src/index.js",
