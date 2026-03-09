@@ -57,6 +57,10 @@ function elapsed(startTime) {
  * @param {Object} intervals - Object with spinnerInterval and msgInterval
  */
 function stopSpinner(intervals) {
+  if (!intervals?.enabled) {
+    return;
+  }
+
   intervals.active = false;
   clearInterval(intervals.spinnerInterval);
   clearInterval(intervals.msgInterval);
@@ -67,7 +71,11 @@ function stopSpinner(intervals) {
  * Display a short startup message
  * @param {number} totalBookmarks - Number of bookmarks to process
  */
-async function showStartMessage(totalBookmarks) {
+async function showStartMessage(totalBookmarks, quiet = false) {
+  if (quiet) {
+    return;
+  }
+
   process.stdout.write(`\n  Starting OpenCode session for ${totalBookmarks} bookmark(s)...\n`);
 }
 
@@ -182,32 +190,40 @@ function summarizeOpencodeError(result) {
 async function invokeAICLI(config, bookmarkCount, options = {}) {
   const timeout = config.opencodeTimeout || 900000;
   const trackTokens = options.trackTokens || false;
+  const quiet = options.quiet || false;
+  const enableSpinner = !quiet && process.stdout.isTTY;
   const model = config.opencodeModel || 'opencode/glm-4.7-free';
   const runDir = config.projectRoot || process.cwd();
 
-  await showStartMessage(bookmarkCount);
+  await showStartMessage(bookmarkCount, quiet);
 
   const startTime = Date.now();
   let spinnerFrame = 0;
   let spinnerMsgFrame = 0;
   let currentSpinnerMsg = SPINNER_MESSAGES[0];
-  const intervals = { active: true, spinnerInterval: null, msgInterval: null };
+  const intervals = { enabled: enableSpinner, active: enableSpinner, spinnerInterval: null, msgInterval: null };
 
-  intervals.msgInterval = setInterval(() => {
-    if (!intervals.active) return;
-    spinnerMsgFrame = (spinnerMsgFrame + 1) % SPINNER_MESSAGES.length;
-    currentSpinnerMsg = SPINNER_MESSAGES[spinnerMsgFrame];
-  }, 10000);
+  if (enableSpinner) {
+    intervals.msgInterval = setInterval(() => {
+      if (!intervals.active) return;
+      spinnerMsgFrame = (spinnerMsgFrame + 1) % SPINNER_MESSAGES.length;
+      currentSpinnerMsg = SPINNER_MESSAGES[spinnerMsgFrame];
+    }, 10000);
 
-  intervals.spinnerInterval = setInterval(() => {
-    if (!intervals.active) return;
-    spinnerFrame = (spinnerFrame + 1) % SPINNER_FRAMES.length;
-    const frame = SPINNER_FRAMES[spinnerFrame];
-    process.stdout.write(`\r  ${frame} ${currentSpinnerMsg}... [${elapsed(startTime)}]          `);
-  }, 150);
+    intervals.spinnerInterval = setInterval(() => {
+      if (!intervals.active) return;
+      spinnerFrame = (spinnerFrame + 1) % SPINNER_FRAMES.length;
+      const frame = SPINNER_FRAMES[spinnerFrame];
+      process.stdout.write(`\r  ${frame} ${currentSpinnerMsg}... [${elapsed(startTime)}]          `);
+    }, 150);
+  }
 
-  process.stdout.write('\n  Processing bookmarks. This can take a few minutes.\n');
-  process.stdout.write('  ...');
+  if (!quiet) {
+    process.stdout.write('\n  Processing bookmarks. This can take a few minutes.\n');
+    if (enableSpinner) {
+      process.stdout.write('  ...');
+    }
+  }
 
   let timeoutId = null;
   let timedOut = false;
@@ -485,8 +501,9 @@ export async function run(options = {}) {
     if (shouldInvoke) {
       console.log(`[${now}] Phase 2: Invoking OpenCode for analysis...`);
 
-      const aiResult = await invokeAICLI(config, bookmarkCount, {
-        trackTokens: options.trackTokens
+        const aiResult = await invokeAICLI(config, bookmarkCount, {
+        trackTokens: options.trackTokens,
+        quiet: options.quiet
       });
 
       if (aiResult.success) {

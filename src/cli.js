@@ -219,6 +219,7 @@ async function main() {
       // Run the full job (same as node src/job.js)
       const jobPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'job.js');
       const trackTokens = args.includes('--track-tokens') || args.includes('-t');
+      const quiet = args.includes('--quiet') || args.includes('-q');
 
       // Parse --limit flag
       const limitIdx = args.findIndex(a => a === '--limit' || a === '-l');
@@ -233,7 +234,7 @@ async function main() {
 
       try {
         const jobModule = await import(pathToFileURL(jobPath).href);
-        const result = await jobModule.default.run({ trackTokens, limit });
+        const result = await jobModule.default.run({ trackTokens, limit, quiet });
         process.exit(result.success ? 0 : 1);
       } catch (err) {
         console.error('Failed to run job:', err.message);
@@ -362,6 +363,7 @@ Commands:
   setup          Interactive setup wizard (start here!)
   run            Run the full job (fetch + process with OpenCode)
   run -t         Run with token usage tracking (--track-tokens)
+  run -q         Run in quiet mode (no spinner/progress animation)
   run --limit N  Process only N bookmarks (for large backlogs)
   fetch [n]      Fetch n tweets (default: 20)
   fetch --all    Fetch ALL bookmarks (paginated)
@@ -375,6 +377,7 @@ Commands:
 Examples:
   xhoard setup                    # First-time setup
   xhoard run                      # Run full automation
+  xhoard run --quiet              # Quiet mode (better for PM2 logs)
   xhoard run --limit 50           # Process 50 bookmarks at a time
   xhoard fetch                    # Fetch latest (uses config source)
   xhoard fetch 50                 # Fetch 50 tweets

@@ -110,6 +110,9 @@ If you don't want to use the wizard to make it easy, you can manually put your s
 # Full job (fetch + process with OpenCode)
 npx xhoard run
 
+# Full job in quiet mode (recommended for PM2/cron logs)
+npx xhoard run --quiet
+
 # Fetch from bookmarks (default)
 npx xhoard fetch 20
 
@@ -253,7 +256,7 @@ Run Xhoard automatically every 30 minutes:
 
 ```bash
 npm install -g pm2
-pm2 start "npx xhoard run" --cron "*/30 * * * *" --name xhoard
+pm2 start "npx xhoard run --quiet" --cron "*/30 * * * *" --name xhoard
 pm2 save
 pm2 startup    # Start on boot
 ```

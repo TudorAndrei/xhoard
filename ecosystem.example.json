@@ -5,7 +5,7 @@
       "script": "bash",
       "args": [
         "-lc",
-        "PATH=$(dirname $(which opencode)):$PATH npx --yes xhoard run"
+        "PATH=$(dirname $(which opencode)):$PATH npx --yes xhoard run --quiet"
       ],
       "cwd": "/path/to/your/project",
       "cron_restart": "*/30 * * * *",
