@@ -1,0 +1,15 @@
+{
+  "apps": [
+    {
+      "name": "xhoard",
+      "script": "bash",
+      "args": [
+        "-lc",
+        "PATH=$(dirname $(which opencode)):$PATH npx --yes xhoard run"
+      ],
+      "cwd": "/path/to/your/project",
+      "cron_restart": "*/30 * * * *",
+      "autorestart": false
+    }
+  ]
+}

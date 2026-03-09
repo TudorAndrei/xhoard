@@ -258,6 +258,15 @@ pm2 save
 pm2 startup    # Start on boot
 ```
 
+You can also use the included PM2 config example:
+
+```bash
+cp ecosystem.example.json ecosystem.json
+# Edit "cwd" in ecosystem.json to your project path
+pm2 start ecosystem.json --update-env
+pm2 save
+```
+
 ### Option B: Cron
 
 ```bash
