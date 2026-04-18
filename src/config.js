@@ -41,9 +41,6 @@ const DEFAULT_CONFIG = {
   // Timezone for date formatting
   timezone: 'America/New_York',
 
-  // Path to bird CLI (if not in PATH)
-  birdPath: null,
-
   // Twitter credentials (can also use AUTH_TOKEN and CT0 env vars)
   twitter: {
     authToken: null,
@@ -228,9 +225,6 @@ export function loadConfig(configPath) {
   if (process.env.TIMEZONE) {
     config.timezone = process.env.TIMEZONE;
   }
-  if (process.env.BIRD_PATH) {
-    config.birdPath = process.env.BIRD_PATH;
-  }
   if (process.env.SOURCE) {
     config.source = process.env.SOURCE;
   }
@@ -269,7 +263,6 @@ export function loadConfig(configPath) {
   config.archiveFile = expandTilde(config.archiveFile);
   config.pendingFile = expandTilde(config.pendingFile);
   config.stateFile = expandTilde(config.stateFile);
-  config.birdPath = expandTilde(config.birdPath);
   config.projectRoot = expandTilde(config.projectRoot);
 
   // Expand ~ in category folders
@@ -301,7 +294,6 @@ export function initConfig(targetPath = './xhoard.config.json') {
     pendingFile: './.state/pending-bookmarks.json',
     stateFile: './.state/bookmarks-state.json',
     timezone: 'America/New_York',
-    birdPath: null,
     twitter: {
       authToken: 'YOUR_AUTH_TOKEN_HERE',
       ct0: 'YOUR_CT0_TOKEN_HERE'

@@ -2,7 +2,7 @@
  * Bookmark Processor - Fetches and prepares Twitter bookmarks for analysis
  *
  * This handles the mechanical work:
- * - Fetching bookmarks via bird CLI
+ * - Fetching bookmarks via the native Twitter client (src/twitter)
  * - Expanding t.co links
  * - Extracting content from linked pages (articles, GitHub repos)
  * - Optional: Bypassing paywalls via archive.ph
@@ -10,14 +10,13 @@
  * Outputs a JSON bundle for AI analysis (OpenCode SDK, etc.)
  */
 
-import { execSync, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
 import { loadConfig } from './config.js';
+import * as twitter from './twitter/index.js';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -26,20 +25,11 @@ dayjs.extend(timezone);
  * Search for the original tweet that published an X article.
  * Used when bookmarked tweet is a share, not the original.
  */
-function searchForArticleTweet(articleId, config) {
+async function searchForArticleTweet(articleId, config) {
   try {
-    const env = buildBirdEnv(config);
-    const birdCmd = config.birdPath || 'bird';
     // articleId is validated as digits-only by caller's regex
     const searchQuery = `url:x.com/i/article/${articleId}`;
-    const output = execSync(`${birdCmd} search "${searchQuery}" -n 5 --json`, {
-      encoding: 'utf8',
-      timeout: 30000,
-      env
-    });
-    const parsed = JSON.parse(output);
-    // bird CLI may return array or { tweets: [...] } depending on version
-    const results = Array.isArray(parsed) ? parsed : (parsed.tweets || []);
+    const results = await twitter.searchTweets(config, searchQuery, 5);
     if (results.length > 0) {
       // Prefer tweets with article metadata (likely the original)
       for (const tweet of results) {
@@ -57,9 +47,9 @@ function searchForArticleTweet(articleId, config) {
 }
 
 /**
- * Fetches X article content via bird CLI.
+ * Fetches X article content via the native Twitter client.
  * Direct HTTP fetch won't work - X articles are JS-rendered SPAs that require
- * the Twitter API (via bird CLI) to get the actual content.
+ * the Twitter GraphQL API to get the actual content.
  */
 export async function fetchXArticleContent(articleUrl, config, sourceTweetId = null) {
   const articleIdMatch = articleUrl.match(/\/i\/article\/(\d+)/);
@@ -68,8 +58,6 @@ export async function fetchXArticleContent(articleUrl, config, sourceTweetId = n
   }
 
   const articleId = articleIdMatch[1];
-  const env = buildBirdEnv(config);
-  const birdCmd = config.birdPath || 'bird';
 
   const extractArticle = (tweetData, source, tweetId) => {
     let articleContent = tweetData.text || '';
@@ -121,28 +109,24 @@ export async function fetchXArticleContent(articleUrl, config, sourceTweetId = n
   // Try the bookmarked tweet first - fastest path when it contains the article directly
   if (sourceTweetId) {
     try {
-      const output = execSync(`${birdCmd} read ${sourceTweetId} --json`, {
-        encoding: 'utf8',
-        timeout: 30000,
-        env
-      });
-      const tweetData = JSON.parse(output);
-      const result = extractArticle(tweetData, 'bird-cli', sourceTweetId);
-      if (result) return result;
-
-      console.log(`  Bookmarked tweet is a share, searching for original article tweet...`);
+      const tweetData = await twitter.fetchTweet(config, sourceTweetId);
+      if (tweetData) {
+        const result = extractArticle(tweetData, 'twitter-client', sourceTweetId);
+        if (result) return result;
+        console.log(`  Bookmarked tweet is a share, searching for original article tweet...`);
+      }
     } catch (error) {
-      console.log(`  Bird CLI article fetch failed: ${error.message}`);
+      console.log(`  Tweet fetch failed: ${error.message}`);
     }
   }
 
   // Bookmarked tweet was a share/retweet - search for the original article tweet
-  const originalTweet = searchForArticleTweet(articleId, config);
+  const originalTweet = await searchForArticleTweet(articleId, config);
   if (originalTweet) {
     // Use search result directly if it has full content (avoids extra API call)
     const searchContent = originalTweet.text || originalTweet.quotedTweet?.text || '';
     if (searchContent.length > 500) {
-      const searchResult = extractArticle(originalTweet, 'bird-cli-search', originalTweet.id);
+      const searchResult = extractArticle(originalTweet, 'twitter-client-search', originalTweet.id);
       if (searchResult) {
         console.log(`  Found original article tweet with full content: ${originalTweet.id}`);
         return searchResult;
@@ -152,19 +136,16 @@ export async function fetchXArticleContent(articleUrl, config, sourceTweetId = n
     // Search result truncated - need full tweet data
     try {
       console.log(`  Found original article tweet: ${originalTweet.id}, fetching full content...`);
-      const output = execSync(`${birdCmd} read ${originalTweet.id} --json`, {
-        encoding: 'utf8',
-        timeout: 30000,
-        env
-      });
-      const tweetData = JSON.parse(output);
-      const readResult = extractArticle(tweetData, 'bird-cli-search-read', originalTweet.id);
-      if (readResult) return readResult;
+      const tweetData = await twitter.fetchTweet(config, originalTweet.id);
+      if (tweetData) {
+        const readResult = extractArticle(tweetData, 'twitter-client-search-read', originalTweet.id);
+        if (readResult) return readResult;
+      }
     } catch (error) {
       console.log(`  Could not read original tweet: ${error.message}`);
     }
 
-    const result = extractArticle(originalTweet, 'bird-cli-search', originalTweet.id);
+    const result = extractArticle(originalTweet, 'twitter-client-search', originalTweet.id);
     if (result) {
       console.log(`  Using search result metadata (truncated content)`);
       return result;
@@ -253,92 +234,33 @@ export function saveState(config, state) {
   fs.writeFileSync(config.stateFile, JSON.stringify(state, null, 2) + '\n');
 }
 
-function buildBirdEnv(config) {
-  const env = { ...process.env };
-  if (config.twitter?.authToken) {
-    env.AUTH_TOKEN = config.twitter.authToken;
+export async function fetchBookmarks(config, count = 10, options = {}) {
+  const useAll = options.all || count > 50;
+  const folderId = options.folderId;
+  const maxPages = useAll
+    ? (options.maxPages || Math.max(Math.ceil(count / 20), 10))
+    : undefined;
+
+  const label = folderId
+    ? `bookmarks (folder ${folderId}${useAll ? `, paged up to ${maxPages}` : `, n=${count}`})`
+    : `bookmarks (${useAll ? `paged up to ${maxPages}` : `n=${count}`})`;
+  console.log(`  Fetching ${label}`);
+
+  let bookmarks = await twitter.fetchBookmarks(config, count, { all: useAll, maxPages, folderId });
+
+  if (bookmarks.length > count && !options.all) {
+    console.log(`  Fetched ${bookmarks.length} bookmarks, limiting to requested ${count}`);
+    bookmarks = bookmarks.slice(0, count);
   }
-  if (config.twitter?.ct0) {
-    env.CT0 = config.twitter.ct0;
-  }
-  return env;
+
+  return bookmarks;
 }
 
-export function fetchBookmarks(config, count = 10, options = {}) {
-  try {
-    const env = buildBirdEnv(config);
-    const birdCmd = config.birdPath || 'bird';
-
-    // Use --all for large fetches (> 50) or when explicitly requested
-    const useAll = options.all || count > 50;
-    const folderId = options.folderId;
-
-    let cmd;
-    if (useAll) {
-      // Paginated fetch - use longer timeout
-      // Calculate maxPages from count (bird returns ~20 per page, use 25 as buffer)
-      const estimatedPagesNeeded = Math.ceil(count / 20);
-      const maxPages = options.maxPages || Math.max(estimatedPagesNeeded, 10);
-      cmd = folderId
-        ? `${birdCmd} bookmarks --folder-id ${folderId} --all --max-pages ${maxPages} --json`
-        : `${birdCmd} bookmarks --all --max-pages ${maxPages} --json`;
-    } else {
-      cmd = folderId
-        ? `${birdCmd} bookmarks --folder-id ${folderId} -n ${count} --json`
-        : `${birdCmd} bookmarks -n ${count} --json`;
-    }
-
-    console.log(`  Running: ${cmd.replace(/--json/, '').trim()}`);
-
-    // Use temp file to work around bird CLI pipe buffering bug
-    const tmpFile = path.join(os.tmpdir(), `xhoard-bookmarks-${Date.now()}.json`);
-    execSync(`${cmd} > "${tmpFile}"`, {
-      timeout: useAll ? 180000 : 60000, // 3 min for --all, 60s otherwise
-      env,
-      shell: true
-    });
-    const output = fs.readFileSync(tmpFile, 'utf8');
-    fs.unlinkSync(tmpFile);
-    const parsed = JSON.parse(output);
-    // bird CLI v0.6.0+ returns { tweets: [...], nextCursor: ... } for paginated requests
-    // but plain arrays for non-paginated. Handle both formats.
-    let bookmarks = Array.isArray(parsed) ? parsed : (parsed.tweets || []);
-
-    // Respect the count parameter - truncate if we fetched more than requested
-    // (paginated mode may return more bookmarks than asked for)
-    if (bookmarks.length > count) {
-      console.log(`  Fetched ${bookmarks.length} bookmarks, limiting to requested ${count}`);
-      bookmarks = bookmarks.slice(0, count);
-    }
-
-    return bookmarks;
-  } catch (error) {
-    throw new Error(`Failed to fetch bookmarks: ${error.message}`);
-  }
+export async function fetchLikes(config, count = 10) {
+  return twitter.fetchLikes(config, count);
 }
 
-export function fetchLikes(config, count = 10) {
-  try {
-    const env = buildBirdEnv(config);
-    const birdCmd = config.birdPath || 'bird';
-    // Use temp file to work around bird CLI pipe buffering bug
-    const tmpFile = path.join(os.tmpdir(), `xhoard-likes-${Date.now()}.json`);
-    execSync(`${birdCmd} likes -n ${count} --json > "${tmpFile}"`, {
-      timeout: 60000,
-      env,
-      shell: true
-    });
-    const output = fs.readFileSync(tmpFile, 'utf8');
-    fs.unlinkSync(tmpFile);
-    const parsed = JSON.parse(output);
-    // Handle both array and object formats for consistency
-    return Array.isArray(parsed) ? parsed : (parsed.tweets || []);
-  } catch (error) {
-    throw new Error(`Failed to fetch likes: ${error.message}`);
-  }
-}
-
-export function fetchFromSource(config, count = 10, options = {}) {
+export async function fetchFromSource(config, count = 10, options = {}) {
   const source = config.source || 'bookmarks';
 
   if (source === 'bookmarks') {
@@ -346,8 +268,8 @@ export function fetchFromSource(config, count = 10, options = {}) {
   } else if (source === 'likes') {
     return fetchLikes(config, count);
   } else if (source === 'both') {
-    const bookmarks = fetchBookmarks(config, count, options);
-    const likes = fetchLikes(config, count);
+    const bookmarks = await fetchBookmarks(config, count, options);
+    const likes = await fetchLikes(config, count);
     // Merge and dedupe by ID
     const seen = new Set();
     const merged = [];
@@ -366,7 +288,7 @@ export function fetchFromSource(config, count = 10, options = {}) {
 /**
  * Fetch bookmarks from configured folders, tagging each with its folder name
  */
-export function fetchFromFolders(config, count = 10, options = {}) {
+export async function fetchFromFolders(config, count = 10, options = {}) {
   const folders = config.folders || {};
   const folderIds = Object.keys(folders);
 
@@ -384,7 +306,7 @@ export function fetchFromFolders(config, count = 10, options = {}) {
     console.log(`\n📁 Folder "${folderTag}" (${folderId}):`);
 
     try {
-      const bookmarks = fetchBookmarks(config, count, { ...options, folderId });
+      const bookmarks = await fetchBookmarks(config, count, { ...options, folderId });
       let added = 0;
 
       for (const bookmark of bookmarks) {
@@ -407,16 +329,9 @@ export function fetchFromFolders(config, count = 10, options = {}) {
   return allBookmarks;
 }
 
-export function fetchTweet(config, tweetId) {
+export async function fetchTweet(config, tweetId) {
   try {
-    const env = buildBirdEnv(config);
-    const birdCmd = config.birdPath || 'bird';
-    const output = execSync(`${birdCmd} read ${tweetId} --json`, {
-      encoding: 'utf8',
-      timeout: 15000,
-      env
-    });
-    return JSON.parse(output);
+    return await twitter.fetchTweet(config, tweetId);
   } catch (error) {
     console.log(`  Could not fetch parent tweet ${tweetId}: ${error.message}`);
     return null;
@@ -773,11 +688,11 @@ export async function fetchAndPrepareBookmarks(options = {}) {
   if (hasFolders && source === 'bookmarks') {
     // Fetch from each configured folder with tags
     console.log(`Fetching from ${Object.keys(config.folders).length} folder(s)${includeMedia ? ' (with media)' : ''}`);
-    tweets = fetchFromFolders(configWithOptions, count, fetchOptions);
+    tweets = await fetchFromFolders(configWithOptions, count, fetchOptions);
   } else {
     // Normal fetch from source
     console.log(`Fetching from source: ${source}${includeMedia ? ' (with media)' : ''}${fetchOptions.all ? ' (paginated)' : ''}`);
-    tweets = fetchFromSource(configWithOptions, count, fetchOptions);
+    tweets = await fetchFromSource(configWithOptions, count, fetchOptions);
   }
 
   if (!tweets || tweets.length === 0) {
@@ -900,7 +815,7 @@ export async function fetchAndPrepareBookmarks(options = {}) {
             if (tweetIdMatch) {
               const quotedTweetId = tweetIdMatch[1];
               console.log(`  Quote tweet detected, fetching ${quotedTweetId}...`);
-              const quotedTweet = fetchTweet(config, quotedTweetId);
+              const quotedTweet = await fetchTweet(config, quotedTweetId);
               if (quotedTweet) {
                 content = {
                   id: quotedTweet.id,
@@ -996,7 +911,7 @@ export async function fetchAndPrepareBookmarks(options = {}) {
       let replyContext = null;
       if (bookmark.inReplyToStatusId) {
         console.log(`  This is a reply to ${bookmark.inReplyToStatusId}, fetching parent...`);
-        const parentTweet = fetchTweet(config, bookmark.inReplyToStatusId);
+        const parentTweet = await fetchTweet(config, bookmark.inReplyToStatusId);
         if (parentTweet) {
           replyContext = {
             id: parentTweet.id,

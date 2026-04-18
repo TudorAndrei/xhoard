@@ -14,7 +14,7 @@
 
 import { fetchAndPrepareBookmarks, getExistingBookmarkIds } from './processor.js';
 import { initConfig, loadConfig } from './config.js';
-import { execSync } from 'child_process';
+import * as twitter from './twitter/index.js';
 import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
@@ -45,47 +45,8 @@ Xhoard Setup Wizard
 This will set up Xhoard to automatically archive your Twitter bookmarks.
 `);
 
-  // Step 1: Check for bird CLI with bookmarks support (v0.5.0+)
-  console.log('Step 1: Checking for bird CLI...');
-  try {
-    const versionOutput = execSync('bird --version', { stdio: 'pipe', encoding: 'utf8' });
-    const versionMatch = versionOutput.match(/(\d+)\.(\d+)\.(\d+)/);
-
-    if (versionMatch) {
-      const [, major, minor] = versionMatch.map(Number);
-      if (major === 0 && minor < 5) {
-        console.log(`  ✗ bird CLI v${versionMatch[0]} found, but v0.5.0+ required for bookmarks support
-
-  Update it:
-    npm install -g @steipete/bird@latest
-
-  Or with Homebrew:
-    brew upgrade steipete/tap/bird
-
-  Then run this setup again.
-`);
-        process.exit(1);
-      }
-      console.log(`  ✓ bird CLI v${versionMatch[0]} found (bookmarks supported)\n`);
-    } else {
-      console.log('  ✓ bird CLI found\n');
-    }
-  } catch {
-    console.log(`  ✗ bird CLI not found
-
-  Install it:
-    npm install -g @steipete/bird@latest
-
-  Or with Homebrew:
-    brew install steipete/tap/bird
-
-  Then run this setup again.
-`);
-    process.exit(1);
-  }
-
-  // Step 2: Get Twitter credentials
-  console.log(`Step 2: Twitter Authentication
+  // Step 1: Get Twitter credentials
+  console.log(`Step 1: Twitter Authentication
 
   You need your Twitter cookies to fetch bookmarks.
 
@@ -108,11 +69,10 @@ This will set up Xhoard to automatically archive your Twitter bookmarks.
     process.exit(1);
   }
 
-  // Step 3: Test credentials
-  console.log('\nStep 3: Testing credentials...');
+  // Step 2: Test credentials
+  console.log('\nStep 2: Testing credentials...');
   try {
-    const env = { ...process.env, AUTH_TOKEN: authToken, CT0: ct0 };
-    execSync('bird bookmarks -n 1 --json', { env, stdio: 'pipe', timeout: 30000 });
+    await twitter.fetchBookmarks({ twitter: { authToken, ct0 } }, 1);
     console.log('  ✓ Credentials work!\n');
   } catch (error) {
     console.log(`  ✗ Could not fetch bookmarks. Check your credentials and try again.
@@ -121,8 +81,8 @@ This will set up Xhoard to automatically archive your Twitter bookmarks.
     process.exit(1);
   }
 
-  // Step 4: Create config
-  console.log('Step 4: Creating configuration...');
+  // Step 3: Create config
+  console.log('Step 3: Creating configuration...');
   const config = {
     archiveMode: 'files',
     archiveDir: './bookmarks',
@@ -150,8 +110,8 @@ This will set up Xhoard to automatically archive your Twitter bookmarks.
   fs.mkdirSync('./knowledge/tools', { recursive: true });
   fs.mkdirSync('./knowledge/articles', { recursive: true });
 
-  // Step 5: Ask about automation
-  console.log('Step 5: Automation Setup\n');
+  // Step 4: Ask about automation
+  console.log('Step 4: Automation Setup\n');
   const wantsCron = await prompt('  Set up automatic fetching every 30 minutes? (y/n): ');
 
   if (wantsCron.toLowerCase() === 'y') {
@@ -173,8 +133,8 @@ This will set up Xhoard to automatically archive your Twitter bookmarks.
 `);
   }
 
-  // Step 6: First fetch
-  console.log('\nStep 6: Fetching your bookmarks...\n');
+  // Step 5: First fetch
+  console.log('\nStep 5: Fetching your bookmarks...\n');
 
   try {
     const result = await fetchAndPrepareBookmarks({ count: 20 });
