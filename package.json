@@ -29,7 +29,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/TudorAndrei/xhoard"
+    "url": "git+https://github.com/TudorAndrei/xhoard.git"
   },
   "bugs": {
     "url": "https://github.com/TudorAndrei/xhoard/issues"
