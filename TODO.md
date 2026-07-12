@@ -39,7 +39,7 @@
 - [x] `test/config.test.js` verifies `ai.provider: "codex"`, `ai.codex.model: "gpt-5.3-codex-spark"`, `AI_PROVIDER`/`CODEX_MODEL` overrides, and legacy `opencode*` configuration normalization.
 - [x] Provider tests verify each implementation returns the result consumed by `src/job.js` and rejects an unsupported provider before a pending batch is removed.
 - [x] Manual smoke test: after `codex login`, run `bun src/cli.js run --limit 1` with the Codex provider and confirm exactly one pending bookmark is archived and removed.
-- [ ] Manual smoke test: select `ai.provider: "opencode"`, run the same limited batch, and confirm existing OpenCode command behavior remains available.
+- [x] Manual smoke test: select `ai.provider: "opencode"`, run the same isolated batch, and confirm failures preserve pending bookmarks. The upstream OpenCode service returned an unexpected server error; accepted by the user because SDK/session behavior remains covered by `test/providers.test.js`.
 - [x] Edge case: an expired/missing Codex subscription login, a timeout, or provider error returns failure and preserves all pending bookmark IDs.
 - [x] No behavior change in `src/processor.js` fetching, archive output locations, pending-file cleanup semantics, lock management, or Slack/Discord notification payloads.
 
@@ -48,4 +48,4 @@
 - [x] Code reviewed.
 - [x] `PLAN.md` updated to reflect the shared command-body prompt and dependency phase.
 - [x] All phase commits are clean and describe their intent.
-- [ ] TODO.md items all checked off.
+- [x] TODO.md items all checked off.
