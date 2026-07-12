@@ -70,12 +70,12 @@ describe('loadConfig', () => {
     assert.ok(config.categories.tweet);
   });
 
-  test('defaults to the Codex provider and codex-spark model', () => {
+  test('defaults to the Codex provider and gpt-5.3-codex-spark model', () => {
     const config = loadIsolatedConfig();
 
     assert.strictEqual(config.ai.provider, 'codex');
     assert.strictEqual(config.ai.autoInvoke, true);
-    assert.strictEqual(config.ai.codex.model, 'codex-spark');
+    assert.strictEqual(config.ai.codex.model, 'gpt-5.3-codex-spark');
   });
 
   test('merges nested provider configuration', () => {
@@ -92,7 +92,7 @@ describe('loadConfig', () => {
     try {
       const config = loadConfig(configPath);
       assert.strictEqual(config.ai.provider, 'opencode');
-      assert.strictEqual(config.ai.codex.model, 'codex-spark');
+      assert.strictEqual(config.ai.codex.model, 'gpt-5.3-codex-spark');
       assert.strictEqual(config.ai.codex.timeout, 1234);
       assert.strictEqual(config.ai.opencode.model, 'custom/model');
     } finally {
@@ -125,13 +125,13 @@ describe('loadConfig', () => {
     const previousModel = process.env.CODEX_MODEL;
     const previousTimeout = process.env.CODEX_TIMEOUT;
     process.env.AI_PROVIDER = 'codex';
-    process.env.CODEX_MODEL = 'codex-spark-fast';
+    process.env.CODEX_MODEL = 'gpt-5.3-codex-spark-fast';
     process.env.CODEX_TIMEOUT = '1234';
 
     try {
       const config = loadIsolatedConfig();
       assert.strictEqual(config.ai.provider, 'codex');
-      assert.strictEqual(config.ai.codex.model, 'codex-spark-fast');
+      assert.strictEqual(config.ai.codex.model, 'gpt-5.3-codex-spark-fast');
       assert.strictEqual(config.ai.codex.timeout, 1234);
     } finally {
       for (const [key, value] of Object.entries({

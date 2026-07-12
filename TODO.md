@@ -22,17 +22,23 @@
 ## Phase 3: Package and document both execution paths
 
 - [x] Remove `package-lock.json` so Bun is the sole lockfile authority.
-- [x] Document provider selection, `codex login`, `codex-spark`, OpenCode fallback, and environment variables in `README.md`, `src/cli.js`, and `ecosystem.example.json`.
+- [x] Document provider selection, `codex login`, `gpt-5.3-codex-spark`, OpenCode fallback, and environment variables in `README.md`, `src/cli.js`, and `ecosystem.example.json`.
 - [x] Run the Bun test suite and focused configuration/provider tests.
 - [x] Smoke-test `bun src/cli.js status` with both `ai.provider` values and verify a failed Codex login leaves `pendingFile` unchanged.
 - [x] Commit: `docs(providers): document Codex and OpenCode configuration`
 
+## Phase 4: Correct the Codex-Spark model identifier
+
+- [x] Replace the `codex-spark` shorthand with `gpt-5.3-codex-spark` in defaults, SDK execution, documentation, and tests.
+- [x] Smoke-test `gpt-5.3-codex-spark` with a disposable pending batch and verify one archive file is written and the pending batch reaches zero.
+- [x] Commit: `fix(codex): use the full Codex-Spark model identifier`
+
 ## Verification
 
 - [x] `bun test` passes with no changes to bookmark fetch, archive, category, or webhook behavior.
-- [x] `test/config.test.js` verifies `ai.provider: "codex"`, `ai.codex.model: "codex-spark"`, `AI_PROVIDER`/`CODEX_MODEL` overrides, and legacy `opencode*` configuration normalization.
+- [x] `test/config.test.js` verifies `ai.provider: "codex"`, `ai.codex.model: "gpt-5.3-codex-spark"`, `AI_PROVIDER`/`CODEX_MODEL` overrides, and legacy `opencode*` configuration normalization.
 - [x] Provider tests verify each implementation returns the result consumed by `src/job.js` and rejects an unsupported provider before a pending batch is removed.
-- [ ] Manual smoke test: after `codex login`, run `bun src/cli.js run --limit 1` with the Codex provider and confirm exactly one pending bookmark is archived and removed.
+- [x] Manual smoke test: after `codex login`, run `bun src/cli.js run --limit 1` with the Codex provider and confirm exactly one pending bookmark is archived and removed.
 - [ ] Manual smoke test: select `ai.provider: "opencode"`, run the same limited batch, and confirm existing OpenCode command behavior remains available.
 - [x] Edge case: an expired/missing Codex subscription login, a timeout, or provider error returns failure and preserves all pending bookmark IDs.
 - [x] No behavior change in `src/processor.js` fetching, archive output locations, pending-file cleanup semantics, lock management, or Slack/Discord notification payloads.

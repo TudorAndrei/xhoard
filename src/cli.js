@@ -98,7 +98,7 @@ This will set up Xhoard to automatically archive your Twitter bookmarks.
     ai: {
       provider: 'codex',
       autoInvoke: true,
-      codex: { model: 'codex-spark', timeout: 900000 },
+      codex: { model: 'gpt-5.3-codex-spark', timeout: 900000 },
       opencode: { model: 'opencode/glm-4.7-free', timeout: 900000 }
     }
   };

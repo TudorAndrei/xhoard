@@ -21,7 +21,7 @@ function normalizeUsage(usage, model) {
 export async function invokeCodex({ config, bookmarkCount, runDir, createCodex = () => new Codex() }) {
   const providerConfig = config.ai?.codex || {};
   const timeout = providerConfig.timeout || 900000;
-  const model = providerConfig.model || 'codex-spark';
+  const model = providerConfig.model || 'gpt-5.3-codex-spark';
   const controller = new AbortController();
   let timedOut = false;
   const timeoutId = setTimeout(() => {

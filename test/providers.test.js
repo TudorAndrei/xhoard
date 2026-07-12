@@ -7,13 +7,13 @@ import { invokeAIProvider } from '../src/providers/index.js';
 const config = {
   ai: {
     provider: 'codex',
-    codex: { model: 'codex-spark', timeout: 1000 },
+    codex: { model: 'gpt-5.3-codex-spark', timeout: 1000 },
     opencode: { model: 'opencode/test-model', timeout: 1000 }
   }
 };
 
 describe('Codex provider', () => {
-  test('runs codex-spark with subscription-compatible CLI options', async () => {
+  test('runs gpt-5.3-codex-spark with subscription-compatible CLI options', async () => {
     let receivedOptions;
     let receivedPrompt;
     let receivedSignal;
@@ -44,7 +44,7 @@ describe('Codex provider', () => {
     });
 
     assert.deepStrictEqual(receivedOptions, {
-      model: 'codex-spark',
+      model: 'gpt-5.3-codex-spark',
       sandboxMode: 'workspace-write',
       workingDirectory: '/tmp/xhoard',
       skipGitRepoCheck: true,
@@ -64,7 +64,7 @@ describe('Codex provider', () => {
       cacheWrite: 0,
       subagentInput: 0,
       subagentOutput: 0,
-      model: 'codex-spark',
+      model: 'gpt-5.3-codex-spark',
       subagentModel: null
     });
   });
@@ -94,7 +94,7 @@ describe('Codex provider', () => {
     const result = await invokeCodex({
       config: {
         ...config,
-        ai: { ...config.ai, codex: { model: 'codex-spark', timeout: 1 } }
+        ai: { ...config.ai, codex: { model: 'gpt-5.3-codex-spark', timeout: 1 } }
       },
       bookmarkCount: 1,
       runDir: '/tmp/xhoard',

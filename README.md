@@ -2,7 +2,7 @@
 
 Archive your Twitter/X bookmarks (and likes, optionally) to markdown. Automatically.
 
-Xhoard fetches bookmarks via Twitter's GraphQL API directly (no external CLI required), extracts content from linked pages, and uses a selectable AI provider to categorize and file them. New configurations use Codex with `codex-spark`; [OpenCode](https://github.com/opencode-ai/opencode) remains available.
+Xhoard fetches bookmarks via Twitter's GraphQL API directly (no external CLI required), extracts content from linked pages, and uses a selectable AI provider to categorize and file them. New configurations use Codex with `gpt-5.3-codex-spark`; [OpenCode](https://github.com/opencode-ai/opencode) remains available.
 
 ## Quick Start
 
@@ -98,7 +98,7 @@ See `xhoard.config.example.json` for the full shape. Common options:
 | `includeMedia` | `false` | Experimental: include photos/videos/GIFs |
 | `ai.provider` | `codex` | `codex` or `opencode` |
 | `ai.autoInvoke` | `true` | Run the selected provider after fetching |
-| `ai.codex.model` | `codex-spark` | Codex model to use with the local ChatGPT subscription login |
+| `ai.codex.model` | `gpt-5.3-codex-spark` | Codex model to use with the local ChatGPT subscription login |
 | `ai.opencode.model` | `opencode/glm-4.7-free` | Model to use when `ai.provider` is `opencode` |
 | `webhookUrl` | `null` | Discord/Slack notifications |
 
@@ -110,7 +110,7 @@ Configure both providers in one file and switch between them with `ai.provider`:
     "provider": "codex",
     "autoInvoke": true,
     "codex": {
-      "model": "codex-spark",
+      "model": "gpt-5.3-codex-spark",
       "timeout": 900000
     },
     "opencode": {
