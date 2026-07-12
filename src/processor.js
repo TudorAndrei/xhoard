@@ -7,7 +7,7 @@
  * - Extracting content from linked pages (articles, GitHub repos)
  * - Optional: Bypassing paywalls via archive.ph
  *
- * Outputs a JSON bundle for AI analysis (OpenCode SDK, etc.)
+ * Outputs a JSON bundle for AI analysis providers.
  */
 
 import fs from 'fs';

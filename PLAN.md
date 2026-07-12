@@ -28,16 +28,17 @@ The processing instructions will have one source of truth that is loadable by th
 - Add `src/providers/index.js` as the provider selector and normalized invocation boundary used by `src/job.js`.
 - Move the existing `createOpencode` session lifecycle from `src/job.js` into `src/providers/opencode.js`, preserving command invocation, timeout handling, output extraction, and normalized token-usage reporting.
 - Add `src/providers/codex.js` using `@openai/codex-sdk` to run the shared processing prompt in `config.projectRoot` (or the current directory), pass the selected `codex-spark` model, surface final text and available usage, and report an actionable error when Codex CLI subscription login is unavailable.
-- Move the bookmark-processing instructions into a package-shipped shared prompt file, and reduce `.opencode/commands/process-bookmarks.md` to reference that source so OpenCode's manual command and Codex SDK execution use the same rules.
+- Add `src/providers/prompt.js` to load the package-shipped `.opencode/commands/process-bookmarks.md` command body directly, so Codex SDK execution and manual OpenCode command runs use the same rules without duplicating the prompt.
 - Replace `invokeAICLI` and OpenCode-specific messages in `src/job.js` with provider-dispatch calls and provider-aware progress, success, disabled, and failure output, without changing pending-file cleanup or webhook behavior.
 - Add provider-focused tests with mocked SDK boundaries covering selection, invalid provider names, Codex result normalization, provider failures, and the no-AI fallback path.
+- Use Bun to add `@openai/codex-sdk` and refresh `bun.lock`, retaining `@opencode-ai/sdk` for the existing provider.
+- Update `package.json` description and keywords for both providers while retaining the OpenCode command required by that provider.
 
 **Commit:** `feat(providers): add Codex-Spark bookmark processing`
 
 ### Phase 3: Package and document both execution paths
 
-- Use Bun to add `@openai/codex-sdk`, retain `@opencode-ai/sdk`, refresh `bun.lock`, and remove the obsolete npm lockfile so Bun is the sole lockfile authority.
-- Update `package.json` keywords and published-file entries for the shared prompt while retaining the OpenCode command required by that provider.
+- Remove the obsolete npm lockfile so Bun is the sole lockfile authority.
 - Update `README.md`, `ecosystem.example.json`, and CLI help text to document provider selection, the default Codex-Spark flow, the `codex login` prerequisite for ChatGPT subscription use, OpenCode selection, relevant environment variables, and provider-specific troubleshooting.
 - Run the complete Bun test suite plus focused configuration/provider tests, then manually smoke-test `bun src/cli.js status` with each provider configuration and a Codex-authentication failure that leaves pending bookmarks intact.
 

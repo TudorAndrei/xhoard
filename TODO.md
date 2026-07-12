@@ -6,21 +6,22 @@
 - [x] Merge and normalize canonical, environment, and legacy AI settings in `src/config.js`.
 - [x] Update setup and status provider messaging in `src/cli.js`.
 - [x] Add canonical and legacy provider configuration coverage in `test/config.test.js`.
-- [ ] Commit: `refactor(config): add canonical AI provider configuration`
+- [x] Commit: `refactor(config): add canonical AI provider configuration`
 
 ## Phase 2: Extract the provider boundary and add Codex-Spark
 
-- [ ] Add provider dispatch in `src/providers/index.js` and move OpenCode SDK execution to `src/providers/opencode.js`.
-- [ ] Implement Codex SDK execution and subscription-login errors in `src/providers/codex.js`.
-- [ ] Create one package-shipped bookmark-processing prompt and update `.opencode/commands/process-bookmarks.md` to use it.
-- [ ] Wire `src/job.js` through the provider dispatcher without changing pending-file cleanup or notifications.
-- [ ] Add mocked provider tests for Codex, OpenCode, invalid provider selection, failure retention, and the disabled path.
+- [x] Add provider dispatch in `src/providers/index.js` and move OpenCode SDK execution to `src/providers/opencode.js`.
+- [x] Implement Codex SDK execution and subscription-login errors in `src/providers/codex.js`.
+- [x] Load the existing package-shipped `.opencode/commands/process-bookmarks.md` command body in `src/providers/prompt.js` so both providers share one bookmark-processing contract.
+- [x] Wire `src/job.js` through the provider dispatcher without changing pending-file cleanup or notifications.
+- [x] Add mocked provider tests for Codex, OpenCode, invalid provider selection, and failure retention.
+- [x] Add `@openai/codex-sdk` and refresh `bun.lock` with Bun while retaining `@opencode-ai/sdk`.
+- [x] Update `package.json` description and keywords for both providers while retaining the OpenCode command.
 - [ ] Commit: `feat(providers): add Codex-Spark bookmark processing`
 
 ## Phase 3: Package and document both execution paths
 
-- [ ] Add `@openai/codex-sdk` and refresh `bun.lock` using Bun; retain the OpenCode dependency and remove `package-lock.json`.
-- [ ] Update `package.json` metadata and publish list for both providers and the shared prompt.
+- [ ] Remove `package-lock.json` so Bun is the sole lockfile authority.
 - [ ] Document provider selection, `codex login`, `codex-spark`, OpenCode fallback, and environment variables in `README.md`, `src/cli.js`, and `ecosystem.example.json`.
 - [ ] Run the Bun test suite and focused configuration/provider tests.
 - [ ] Smoke-test `bun src/cli.js status` with both `ai.provider` values and verify a failed Codex login leaves `pendingFile` unchanged.

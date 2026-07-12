@@ -3,10 +3,10 @@
  *
  * Full two-phase workflow:
  * 1. Fetch bookmarks, expand links, extract content
- * 2. Invoke OpenCode via SDK for analysis and filing
+ * 2. Invoke the selected AI provider for analysis and filing
  *
  * Can be used with:
- * - Cron: "0,30 * * * *" (every 30 min) - node /path/to/xhoard/src/job.js
+ * - Cron: "0,30 * * * *" (every 30 min) - bun /path/to/xhoard/src/job.js
  * - Bree: Import and add to your Bree jobs array
  * - systemd timers: See README for setup
  * - Any other scheduler
@@ -15,9 +15,9 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { createOpencode } from '@opencode-ai/sdk';
 import { fetchAndPrepareBookmarks } from './processor.js';
 import { loadConfig } from './config.js';
+import { getProviderName, invokeAIProvider } from './providers/index.js';
 
 const JOB_NAME = 'xhoard';
 const LOCK_FILE = path.join(os.tmpdir(), 'xhoard.lock');
@@ -71,12 +71,12 @@ function stopSpinner(intervals) {
  * Display a short startup message
  * @param {number} totalBookmarks - Number of bookmarks to process
  */
-async function showStartMessage(totalBookmarks, quiet = false) {
+async function showStartMessage(totalBookmarks, providerName, quiet = false) {
   if (quiet) {
     return;
   }
 
-  process.stdout.write(`\n  Starting OpenCode session for ${totalBookmarks} bookmark(s)...\n`);
+  process.stdout.write(`\n  Starting ${providerName} session for ${totalBookmarks} bookmark(s)...\n`);
 }
 
 /**
@@ -154,48 +154,14 @@ function releaseLock() {
 }
 
 
-function parseModel(model) {
-  if (!model || typeof model !== 'string' || !model.includes('/')) {
-    return null;
-  }
-
-  const [providerID, ...modelParts] = model.split('/');
-  if (!providerID || modelParts.length === 0) {
-    return null;
-  }
-
-  return { providerID, modelID: modelParts.join('/') };
-}
-
-function extractTextFromParts(parts = []) {
-  return parts
-    .filter((part) => part.type === 'text' && part.text)
-    .map((part) => part.text)
-    .join('\n\n');
-}
-
-function summarizeOpencodeError(result) {
-  if (!result?.error) {
-    return 'Unknown OpenCode SDK error';
-  }
-
-  const err = result.error;
-  if (err?.data?.message) {
-    return `${err.name}: ${err.data.message}`;
-  }
-
-  return err.name || 'Unknown OpenCode SDK error';
-}
-
-async function invokeAICLI(config, bookmarkCount, options = {}) {
-  const timeout = config.opencodeTimeout || 900000;
+async function invokeAIProviderWithProgress(config, bookmarkCount, options = {}) {
   const trackTokens = options.trackTokens || false;
   const quiet = options.quiet || false;
   const enableSpinner = !quiet && process.stdout.isTTY;
-  const model = config.opencodeModel || 'opencode/glm-4.7-free';
   const runDir = config.projectRoot || process.cwd();
+  const providerName = getProviderName(config.ai?.provider);
 
-  await showStartMessage(bookmarkCount, quiet);
+  await showStartMessage(bookmarkCount, providerName, quiet);
 
   const startTime = Date.now();
   let spinnerFrame = 0;
@@ -225,83 +191,21 @@ async function invokeAICLI(config, bookmarkCount, options = {}) {
     }
   }
 
-  let timeoutId = null;
-  let timedOut = false;
-  let server = null;
-  let client = null;
-  let sessionId = null;
-
   try {
-    const sdk = await createOpencode({
-      config: { model }
+    const providerInvoker = options.invokeProvider || invokeAIProvider;
+    const result = await providerInvoker({
+      config,
+      bookmarkCount,
+      runDir
     });
-
-    client = sdk.client;
-    server = sdk.server;
-
-    const createResult = await client.session.create({
-      body: {
-        title: `Xhoard bookmark batch ${new Date().toISOString()}`
-      },
-      query: { directory: runDir }
-    });
-
-    if (createResult.error) {
-      throw new Error(summarizeOpencodeError(createResult));
-    }
-
-    sessionId = createResult.data.id;
-    const parsedModel = parseModel(model);
-
-    timeoutId = setTimeout(async () => {
-      timedOut = true;
-      if (!client || !sessionId) return;
-
-      try {
-        await client.session.abort({
-          path: { id: sessionId },
-          query: { directory: runDir }
-        });
-      } catch {}
-    }, timeout);
-
-    const commandResult = await client.session.command({
-      body: {
-        command: 'process-bookmarks',
-        arguments: String(bookmarkCount),
-        ...(parsedModel ? { model } : {})
-      },
-      path: { id: sessionId },
-      query: { directory: runDir }
-    });
-
-    if (timedOut) {
-      return {
-        success: false,
-        error: `Timeout after ${timeout}ms`
-      };
-    }
-
-    if (commandResult.error) {
-      throw new Error(summarizeOpencodeError(commandResult));
-    }
-
-    const info = commandResult.data.info;
-    const parts = commandResult.data.parts || [];
-    const tokenUsage = {
-      input: info.tokens?.input || 0,
-      output: info.tokens?.output || 0,
-      cacheRead: info.tokens?.cache?.read || 0,
-      cacheWrite: info.tokens?.cache?.write || 0,
-      subagentInput: 0,
-      subagentOutput: 0,
-      model: `${info.providerID}/${info.modelID}`,
-      subagentModel: null
-    };
 
     stopSpinner(intervals);
 
-    const tokenDisplay = buildTokenDisplay(tokenUsage, trackTokens);
+    if (!result.success) {
+      return result;
+    }
+
+    const tokenDisplay = buildTokenDisplay(result.tokenUsage, trackTokens);
 
     process.stdout.write(`
 
@@ -309,43 +213,22 @@ async function invokeAICLI(config, bookmarkCount, options = {}) {
 
   Duration:    ${elapsed(startTime)}
   Bookmarks:   ${bookmarkCount} processed
-  Runtime:     OpenCode SDK
+  Runtime:     ${result.runtime}
 ${tokenDisplay}
   Xhoard run finished.
 
 `);
 
     return {
-      success: true,
-      output: extractTextFromParts(parts),
-      tokenUsage
+      ...result
     };
   } catch (error) {
     return {
       success: false,
-      error: error.message || 'OpenCode SDK invocation failed'
+      error: error.message || 'AI provider invocation failed'
     };
   } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-
     stopSpinner(intervals);
-
-    if (client && sessionId) {
-      try {
-        await client.session.delete({
-          path: { id: sessionId },
-          query: { directory: runDir }
-        });
-      } catch {}
-    }
-
-    if (server) {
-      try {
-        server.close();
-      } catch {}
-    }
   }
 }
 
@@ -495,15 +378,16 @@ export async function run(options = {}) {
     // Track IDs we're about to process
     const idsToProcess = pendingData.bookmarks.map(b => b.id);
 
-    // Phase 2: OpenCode analysis
-    const shouldInvoke = config.autoInvokeOpencode !== false;
+    // Phase 2: AI provider analysis
+    const shouldInvoke = config.ai?.autoInvoke !== false;
 
     if (shouldInvoke) {
-      console.log(`[${now}] Phase 2: Invoking OpenCode for analysis...`);
+      console.log(`[${now}] Phase 2: Invoking ${getProviderName(config.ai?.provider)} for analysis...`);
 
-        const aiResult = await invokeAICLI(config, bookmarkCount, {
+      const aiResult = await invokeAIProviderWithProgress(config, bookmarkCount, {
         trackTokens: options.trackTokens,
-        quiet: options.quiet
+        quiet: options.quiet,
+        invokeProvider: options.invokeProvider
       });
 
       if (aiResult.success) {
@@ -558,7 +442,7 @@ export async function run(options = {}) {
           console.log(`[${now}] Restored full pending file for retry`);
         }
 
-        console.error(`[${now}] OpenCode failed:`, aiResult.error);
+        console.error(`[${now}] ${getProviderName(config.ai?.provider)} failed:`, aiResult.error);
 
         await notify(
           config,
@@ -576,7 +460,7 @@ export async function run(options = {}) {
       }
     } else {
       // Auto-invoke disabled - just fetch
-      console.log(`[${now}] OpenCode auto-invoke disabled. Run '/process-bookmarks' in OpenCode manually if needed.`);
+      console.log(`[${now}] AI auto-invoke disabled. ${bookmarkCount} bookmark(s) remain in ${config.pendingFile}.`);
 
       return {
         success: true,

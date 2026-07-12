@@ -1,7 +1,7 @@
 {
   "name": "xhoard",
   "version": "1.1.1",
-  "description": "Archive Twitter/X bookmarks to markdown with link expansion, content extraction, and AI-powered categorization",
+  "description": "Archive Twitter/X bookmarks to markdown with link expansion, content extraction, and selectable Codex or OpenCode categorization",
   "type": "module",
   "main": "src/index.js",
   "bin": {
@@ -20,6 +20,8 @@
     "bookmarks",
     "archive",
     "markdown",
+    "codex",
+    "codex-spark",
     "opencode",
     "twitter-archiver",
     "bookmark-manager",
@@ -48,6 +50,7 @@
   },
   "packageManager": "bun@1.0.0",
   "dependencies": {
+    "@openai/codex-sdk": "^0.144.1",
     "@opencode-ai/sdk": "^1.2.21",
     "dayjs": "^1.11.10"
   },
