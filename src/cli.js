@@ -5,9 +5,9 @@
  *
  * Commands:
  *   setup    - Interactive setup wizard (recommended for first-time users)
- *   run      - Run the full job (fetch + process with OpenCode)
+ *   run      - Run the full job (fetch + process with the selected AI provider)
  *   fetch    - Fetch bookmarks and prepare them for processing
- *   process  - Process pending bookmarks with OpenCode
+ *   process  - Process pending bookmarks with the selected AI provider
  *   status   - Show current configuration and status
  *   init     - Create a config file (non-interactive)
  */
@@ -95,8 +95,12 @@ This will set up Xhoard to automatically archive your Twitter bookmarks.
       authToken,
       ct0
     },
-    autoInvokeOpencode: true,
-    opencodeModel: 'opencode/glm-4.7-free'
+    ai: {
+      provider: 'codex',
+      autoInvoke: true,
+      codex: { model: 'codex-spark', timeout: 900000 },
+      opencode: { model: 'opencode/glm-4.7-free', timeout: 900000 }
+    }
   };
 
   fs.writeFileSync('./xhoard.config.json', JSON.stringify(config, null, 2) + '\n');
@@ -116,7 +120,7 @@ This will set up Xhoard to automatically archive your Twitter bookmarks.
 
   if (wantsCron.toLowerCase() === 'y') {
     const cwd = process.cwd();
-    const cronLine = `*/30 * * * * cd ${cwd} && npx xhoard run >> ${cwd}/xhoard.log 2>&1`;
+    const cronLine = `*/30 * * * * cd ${cwd} && bun src/cli.js run >> ${cwd}/xhoard.log 2>&1`;
 
     console.log(`
   Add this line to your crontab:
@@ -127,8 +131,8 @@ This will set up Xhoard to automatically archive your Twitter bookmarks.
     crontab -e
 
   Or use PM2 for a simpler setup:
-    npm install -g pm2
-    pm2 start "npx xhoard run" --cron "*/30 * * * *" --name xhoard
+    bun add -g pm2
+    pm2 start "bun src/cli.js run" --cron "*/30 * * * *" --name xhoard
     pm2 save
 `);
   }
@@ -157,9 +161,9 @@ Setup Complete!
 Your bookmarks will be saved to: ./bookmarks/
 
 Commands:
-  npx xhoard run    Run full job (fetch + process with OpenCode)
-  npx xhoard fetch  Fetch new bookmarks
-  npx xhoard status Check status
+  bun src/cli.js run    Run full job (fetch + process with the selected provider)
+  bun src/cli.js fetch  Fetch new bookmarks
+  bun src/cli.js status Check status
 
 Done.
 `);
@@ -241,7 +245,7 @@ async function main() {
       if (result.count > 0) {
         console.log(`\n✓ Prepared ${result.count} tweets.`);
         console.log(`  Output: ${result.pendingFile}`);
-        console.log('\nNext: Run `npx xhoard run` to process with OpenCode');
+        console.log('\nNext: Run `bun src/cli.js run` to process with the selected AI provider');
       } else {
         console.log('\nNo new tweets to process.');
       }
@@ -252,7 +256,7 @@ async function main() {
       const config = loadConfig();
 
       if (!fs.existsSync(config.pendingFile)) {
-        console.log('No pending bookmarks. Run `xhoard fetch` first.');
+        console.log('No pending bookmarks. Run `bun src/cli.js fetch` first.');
         process.exit(0);
       }
 
@@ -265,7 +269,7 @@ async function main() {
 
       console.log(`Found ${pending.bookmarks.length} pending bookmarks.\n`);
       console.log('To process them:');
-      console.log('  npx xhoard run\n');
+      console.log('  bun src/cli.js run\n');
 
       console.log('Pending:');
       for (const b of pending.bookmarks.slice(0, 5)) {
@@ -287,7 +291,8 @@ async function main() {
       console.log(`Source:      ${config.source || 'bookmarks'}`);
       console.log(`Media:       ${config.includeMedia ? '✓ enabled (experimental)' : 'disabled (use --media to enable)'}`);
       console.log(`Twitter:     ${config.twitter?.authToken ? '✓ configured' : '✗ not configured'}`);
-      console.log(`Auto-OpenCode: ${config.autoInvokeOpencode ? 'enabled' : 'disabled'}`);
+      console.log(`AI provider:  ${config.ai.provider}`);
+      console.log(`Auto-invoke:  ${config.ai.autoInvoke ? 'enabled' : 'disabled'}`);
 
       if (fs.existsSync(config.pendingFile)) {
         const pending = JSON.parse(fs.readFileSync(config.pendingFile, 'utf8'));
@@ -321,7 +326,7 @@ Xhoard - Twitter Bookmarks & Likes Archiver
 
 Commands:
   setup          Interactive setup wizard (start here!)
-  run            Run the full job (fetch + process with OpenCode)
+  run            Run the full job (fetch + process with the selected AI provider)
   run -t         Run with token usage tracking (--track-tokens)
   run -q         Run in quiet mode (no spinner/progress animation)
   run --limit N  Process only N bookmarks (for large backlogs)
@@ -335,22 +340,23 @@ Commands:
   status         Show current status
 
 Examples:
-  xhoard setup                    # First-time setup
-  xhoard run                      # Run full automation
-  xhoard run --quiet              # Quiet mode (better for PM2 logs)
-  xhoard run --limit 50           # Process 50 bookmarks at a time
-  xhoard fetch                    # Fetch latest (uses config source)
-  xhoard fetch 50                 # Fetch 50 tweets
-  xhoard fetch --all              # Fetch ALL bookmarks (paginated)
-  xhoard fetch --all --max-pages 5  # Fetch up to 5 pages
-  xhoard fetch --source likes     # Fetch from likes only
-  xhoard fetch --source both      # Fetch from bookmarks AND likes
-  xhoard fetch --media            # Include photos/videos/GIFs (experimental)
-  xhoard fetch --force            # Re-process archived tweets
+  bun src/cli.js setup                    # First-time setup
+  bun src/cli.js run                      # Run full automation
+  bun src/cli.js run --quiet              # Quiet mode (better for PM2 logs)
+  bun src/cli.js run --limit 50           # Process 50 bookmarks at a time
+  bun src/cli.js fetch                    # Fetch latest (uses config source)
+  bun src/cli.js fetch 50                 # Fetch 50 tweets
+  bun src/cli.js fetch --all              # Fetch ALL bookmarks (paginated)
+  bun src/cli.js fetch --all --max-pages 5  # Fetch up to 5 pages
+  bun src/cli.js fetch --source likes     # Fetch from likes only
+  bun src/cli.js fetch --source both      # Fetch from bookmarks AND likes
+  bun src/cli.js fetch --media            # Include photos/videos/GIFs (experimental)
+  bun src/cli.js fetch --force            # Re-process archived tweets
 
 Config (xhoard.config.json):
   "source": "bookmarks"    Default source (bookmarks, likes, or both)
   "includeMedia": false    EXPERIMENTAL: Include media (default: off)
+  "ai.provider": "codex"  AI provider (codex or opencode)
   "folders": {}            Map folder IDs to tags (see README)
 
 More info: https://github.com/TudorAndrei/xhoard

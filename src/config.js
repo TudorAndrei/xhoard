@@ -18,6 +18,37 @@ function loadDefaults() {
   return JSON.parse(raw);
 }
 
+function parseTimeout(value) {
+  const timeout = Number.parseInt(value, 10);
+  return Number.isFinite(timeout) && timeout > 0 ? timeout : undefined;
+}
+
+function hasLegacyOpenCodeConfig(config) {
+  return [
+    'autoInvokeOpencode',
+    'opencodeModel',
+    'opencodeTimeout'
+  ].some(key => Object.prototype.hasOwnProperty.call(config, key));
+}
+
+function normalizeLegacyAIConfig(config, fileConfig) {
+  if (!hasLegacyOpenCodeConfig(fileConfig) || fileConfig.ai?.provider) {
+    return;
+  }
+
+  config.ai.provider = 'opencode';
+  if (fileConfig.autoInvokeOpencode !== undefined) {
+    config.ai.autoInvoke = fileConfig.autoInvokeOpencode;
+  }
+  if (fileConfig.opencodeModel) {
+    config.ai.opencode.model = fileConfig.opencodeModel;
+  }
+  if (fileConfig.opencodeTimeout !== undefined) {
+    const timeout = parseTimeout(fileConfig.opencodeTimeout);
+    if (timeout) config.ai.opencode.timeout = timeout;
+  }
+}
+
 export function expandTilde(filepath) {
   if (!filepath || typeof filepath !== 'string') return filepath;
   if (filepath.startsWith('~/')) {
@@ -66,8 +97,16 @@ export function loadConfig(configPath) {
     archiveMode: inferredArchiveMode,
     twitter: { ...defaults.twitter, ...fileConfig.twitter },
     categories: { ...defaults.categories, ...fileConfig.categories },
-    folders: { ...defaults.folders, ...fileConfig.folders }
+    folders: { ...defaults.folders, ...fileConfig.folders },
+    ai: {
+      ...defaults.ai,
+      ...fileConfig.ai,
+      codex: { ...defaults.ai.codex, ...fileConfig.ai?.codex },
+      opencode: { ...defaults.ai.opencode, ...fileConfig.ai?.opencode }
+    }
   };
+
+  normalizeLegacyAIConfig(config, fileConfig);
 
   // Env var overrides
   if (process.env.ARCHIVE_MODE) config.archiveMode = process.env.ARCHIVE_MODE;
@@ -80,9 +119,26 @@ export function loadConfig(configPath) {
   if (process.env.INCLUDE_MEDIA !== undefined) config.includeMedia = process.env.INCLUDE_MEDIA === 'true';
   if (process.env.AUTH_TOKEN) config.twitter.authToken = process.env.AUTH_TOKEN;
   if (process.env.CT0) config.twitter.ct0 = process.env.CT0;
-  if (process.env.AUTO_INVOKE_OPENCODE !== undefined) config.autoInvokeOpencode = process.env.AUTO_INVOKE_OPENCODE === 'true';
-  if (process.env.OPENCODE_MODEL) config.opencodeModel = process.env.OPENCODE_MODEL;
-  if (process.env.OPENCODE_TIMEOUT) config.opencodeTimeout = parseInt(process.env.OPENCODE_TIMEOUT, 10);
+  if (process.env.AI_PROVIDER) config.ai.provider = process.env.AI_PROVIDER;
+  if (process.env.AUTO_INVOKE_AI !== undefined) config.ai.autoInvoke = process.env.AUTO_INVOKE_AI === 'true';
+  if (process.env.CODEX_MODEL) config.ai.codex.model = process.env.CODEX_MODEL;
+  if (process.env.CODEX_TIMEOUT) {
+    const timeout = parseTimeout(process.env.CODEX_TIMEOUT);
+    if (timeout) config.ai.codex.timeout = timeout;
+  }
+
+  // Legacy OpenCode environment variables are still supported for existing
+  // installations. New configuration should use AI_PROVIDER and the ai object.
+  const hasLegacyOpenCodeEnv = process.env.AUTO_INVOKE_OPENCODE !== undefined
+    || Boolean(process.env.OPENCODE_MODEL)
+    || Boolean(process.env.OPENCODE_TIMEOUT);
+  if (!process.env.AI_PROVIDER && hasLegacyOpenCodeEnv) config.ai.provider = 'opencode';
+  if (process.env.AUTO_INVOKE_OPENCODE !== undefined) config.ai.autoInvoke = process.env.AUTO_INVOKE_OPENCODE === 'true';
+  if (process.env.OPENCODE_MODEL) config.ai.opencode.model = process.env.OPENCODE_MODEL;
+  if (process.env.OPENCODE_TIMEOUT) {
+    const timeout = parseTimeout(process.env.OPENCODE_TIMEOUT);
+    if (timeout) config.ai.opencode.timeout = timeout;
+  }
   if (process.env.PROJECT_ROOT) config.projectRoot = process.env.PROJECT_ROOT;
   if (process.env.WEBHOOK_URL) config.webhookUrl = process.env.WEBHOOK_URL;
   if (process.env.WEBHOOK_TYPE) config.webhookType = process.env.WEBHOOK_TYPE;

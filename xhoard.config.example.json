@@ -63,9 +63,18 @@
       "description": "Plain tweets - captured in bookmarks.md only"
     }
   },
-  "autoInvokeOpencode": true,
-  "opencodeModel": "opencode/glm-4.7-free",
-  "opencodeTimeout": 900000,
+  "ai": {
+    "provider": "codex",
+    "autoInvoke": true,
+    "codex": {
+      "model": "codex-spark",
+      "timeout": 900000
+    },
+    "opencode": {
+      "model": "opencode/glm-4.7-free",
+      "timeout": 900000
+    }
+  },
   "projectRoot": null,
   "webhookUrl": null,
   "webhookType": "discord"
