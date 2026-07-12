@@ -89,6 +89,32 @@ describe('Codex provider', () => {
     assert.match(result.error, /codex login/);
     assert.match(result.error, /ChatGPT subscription/);
   });
+
+  test('returns a timeout result when a Codex turn outlives its limit', async () => {
+    const result = await invokeCodex({
+      config: {
+        ...config,
+        ai: { ...config.ai, codex: { model: 'codex-spark', timeout: 1 } }
+      },
+      bookmarkCount: 1,
+      runDir: '/tmp/xhoard',
+      createCodex: () => ({
+        startThread() {
+          return {
+            async run() {
+              await new Promise(resolve => setTimeout(resolve, 10));
+              return { finalResponse: 'late result', usage: null };
+            }
+          };
+        }
+      })
+    });
+
+    assert.deepStrictEqual(result, {
+      success: false,
+      error: 'Timeout after 1ms'
+    });
+  });
 });
 
 describe('OpenCode provider', () => {

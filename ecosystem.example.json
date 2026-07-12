@@ -2,11 +2,8 @@
   "apps": [
     {
       "name": "xhoard",
-      "script": "bash",
-      "args": [
-        "-lc",
-        "PATH=$(dirname $(which opencode)):$PATH npx --yes xhoard run --quiet"
-      ],
+      "script": "bun",
+      "args": "src/cli.js run --quiet",
       "cwd": "/path/to/your/project",
       "cron_restart": "*/30 * * * *",
       "autorestart": false
